@@ -1,0 +1,119 @@
+{{define "NAMESPACE"}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{.Namespace}}
+  labels:
+    platform: zbi
+    project: {{.Name}}
+    version: {{.Version}}
+    owner: {{.Owner}}
+    network: {{.Network}}
+{{end}}
+
+{{define "AUTHZ_DEPLOYMENT"}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authz-server
+  namespace: {{.Namespace}}
+  labels:
+    platform: zbi
+    project: {{.Name}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+    app: authz-server
+spec:
+  selector:
+    matchLabels:
+      platform: zbi
+      project: {{.Name}}
+      version: {{.Version}}
+      network: {{.Network}}
+      owner: {{.Owner}}
+      app: authz-server
+  template:
+    metadata:
+      labels:
+        platform: zbi
+        project: {{.Name}}
+        version: {{.Version}}
+        network: {{.Network}}
+        owner: {{.Owner}}
+        app: authz-server
+    spec:
+#      serviceAccountName: zbi-authz-sa
+      containers:
+      - name: authz-server
+        image: {{.AuthzServerImage}}
+        imagePullPolicy: Always
+        env:
+        - name: ASSET_PATH_DIRECTORY
+          value: "/etc/zbi"
+        - name: MONGODB_URL
+          value: "mongodb+srv://admin:5ysaDYYS7vbs5r4@cluster0.hi6d5.mongodb.net/zbiRepo?retryWrites=true&w=majority"
+        - name: IN_CLUSTER
+          value: "true"
+        ports:
+          - name: grpc
+            containerPort: 50051
+            protocol: TCP
+{{end}}
+
+{{define "AUTHZ_SERVICE"}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: authz-service
+  namespace: {{.Namespace}}
+  labels:
+    platform: zbi
+    project: {{.Name}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+    app: authz-server
+spec:
+  selector:
+    platform: zbi
+    app: authz-server
+    project: {{.Name}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+{{end}}
+
+{{define "HTTP_PROXY"}}
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: zcash-proxy-{{.Name}}
+  namespace: {{.Namespace}}
+  labels:
+    platform: zbi
+    project: {{.Name}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+spec:
+  virtualhost:
+    fqdn: {{.Domain}}
+    tls:
+      secretName: {{.CertName}}
+   authorization:
+      extensionRef:
+        name: authz-service
+  routes:
+{{- range $ .Instances}}
+  - conditions:
+    - prefix: /{{$.Version}}/{{.Name}}/{{$.Name}}
+    services:
+      - name: zcashd-svc-{{$.Name}}
+        port: 28232
+{{- end}}
+{{end}}
