@@ -1,0 +1,6 @@
+compile:
+	go build -v ./...
+
+unit_tests:
+	go clean -testcache
+	export ASSET_PATH_DIRECTORY="./cfg" && go test -v ./...
