@@ -1,0 +1,111 @@
+{{define "CONTROLLER_PROXY"}}
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: zbi-proxy
+  namespace: zbi
+spec:
+  virtualhost:
+    fqdn: api.zbitech.local
+    tls:
+      secretName: kube-system/zbi-tls
+#   authorization:
+#      extensionRef:
+#        name: authz-service
+    includes:
+{{- range $project := .Projects}}
+    - name: {{$project.Name}}
+      namespace: {{$project.Namespace}}
+      conditions:
+      - prefix: /{{$project.Name}}
+{{- end}}
+{{end}}
+
+{{define "CONTROLLER_INGRESS"}}
+{
+  "apiVersion": "projectcontour.io/v1",
+  "kind": "HTTPProxy",
+  "metadata": {
+    "name": "zbi-proxy",
+    "namespace": "zbi",
+    "labels": {
+      "platform": "zbi"
+    }
+  },
+  "spec": {
+    "virtualhost": {
+      "fqdn": "api.zbitech.local",
+      "tls": {
+        "secretName": "kube-system/zbi-tls"
+      },
+      "includes": []
+    }
+  }
+}
+{{end}}
+
+{{define "PROJECT_CONTROLLER_INGRESS"}}
+{
+  "name": "project",
+  "namespace": "project",
+  "conditions": [
+    {"prefix": "/project"}
+  ]
+}
+{{end}}
+
+{{define "PROJECT_PROXY"}}
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{.Name}}-proxy
+  namespace: {{.Namespace}}
+  labels:
+    platform: zbi
+    project: {{.Name}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+spec:
+  routes:
+{{- range $instance := .Instances}}
+  - conditions:
+    - prefix: /{{$instance.Name}}/{{$instance.Version}}
+    services:
+      - name: {{$instance.ServicePrefix}}-{{$instance.Name}}
+        port: {{$instance.ServicePort}}
+{{- end}}
+{{end}}
+
+{{define "PROJECT_INGRESS"}}
+{
+  "apiVersion": "projectcontour.io/v1",
+  "kind": "HTTPProxy",
+  "metadata": {
+    "name": "project-proxy",
+    "namespace": "zbi",
+    "labels":{
+      "platform": "zbi",
+      "project": "{{.Name}}",
+      "version": "{{.Version}}",
+      "network": "{{.Network}}",
+      "owner": "{{.Owner}}"
+    }
+  },
+  "spec": {
+    "routes":[]
+  }
+}
+{{end}}
+
+{{define "INSTANCE_PROJECT_INGRESS"}}
+{
+  "conditions": [
+    {"prefix": "/{{.Name}}/{{.Version}}"}
+  ],
+  "services": [{
+    "name": "{{.ServicePrefix}}-{{.Name}}",
+    "port": {{.ServicePort}}
+  }]
+}
+{{end}}

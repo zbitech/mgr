@@ -14,6 +14,10 @@ for each deployed node to follow an optimal configuration while maintaining its
 independence within adefined boundary. Additionally, it can be extended to support 
 any compatible Zcash node by providing a corresponding resource template manager.
 
+### References
+- https://medium.com/@alphegasolutions/introducing-zbi-e9b2eb346a74
+- https://medium.com/@alphegasolutions/zbi-architecture-a8dc4aaf4357
+
 ### Dependencies
 - http://github.com/zbitech/common
 - https://pkg.go.dev/text/template

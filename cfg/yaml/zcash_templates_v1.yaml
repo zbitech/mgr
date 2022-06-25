@@ -2,31 +2,31 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: zcash-conf-{{.Name}}
-  namespace: {{.Namespace}}
+  name: zcash-conf-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
+    instance: instance
+    project: project
+    version: v1
 data:
   zcash.conf: |
-{{.ZcashConf}}
+    testnet=1
 {{end}}
 
 {{define "ENVOY_CONF"}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: envoy-proxy-conf-{{.Name}}
-  namespace: {{.Namespace}}
+  name: envoy-proxy-conf-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
+    instance: instance
+    project: project
+    version: v1
+    network: testnet
+    owner: admin
 data:
   envoy.yaml: |
     static_resources:
@@ -53,11 +53,11 @@ data:
                   - "*"
                   routes:
                   - match:
-                      prefix: "/{{.Project}}/{{.Name}}/{{.Version}}"
+                      prefix: "/project/instance/v1"
                     request_headers_to_add:
                     - header:
                         key: "Authorization"
-                        value: "Basic {{.Authentication}}"
+                        value: "Basic emNhc2hycGM6cGFzc3dvcmQ="
                       append: false
                     route:
                       cluster: zcash
@@ -71,7 +71,7 @@ data:
                   grpc_service:
                     envoy_grpc:
                       cluster_name: ext-authz
-                    timeout: {{.Timeout}}s
+                    timeout: 2.0s
                   with_request_body:
                     max_request_bytes: 8192
                     allow_partial_message: true
@@ -84,7 +84,7 @@ data:
 
       clusters:
       - name: zcash
-        connect_timeout: {{.Timeout}}s
+        connect_timeout: 2.0s
         type: strict_dns
         load_assignment:
           cluster_name: zcash
@@ -94,10 +94,10 @@ data:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: {{.Port}}
+                    port_value: 18232
 
       - name: ext-authz
-        connect_timeout: {{.Timeout}}s
+        connect_timeout: 2.0s
         type: strict_dns
         typed_extension_protocol_options:
           envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -111,7 +111,7 @@ data:
             - endpoint:
                 address:
                   socket_address:
-                    address: authz-service.{{.Namespace}}.svc.cluster.local
+                    address: authz-service.zbi.svc.cluster.local
                     port_value: 50051
 
 
@@ -127,38 +127,37 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: credentials-{{.Name}}
-  namespace: {{.Namespace}}
+  name: credentials-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
+    instance: instance
+    project: project
+    version: v1
+    network: testnet
+    owner: admin
 data:
-  username: {{.Username}}
-  password: {{.Password}}
+  username: emNhc2hycGM=
+  password: cGFzc3dvcmQ=
 {{end}}
 
 {{define "DATA"}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: zcash-data-{{.Name}}
-  namespace: {{.Namespace}}
+  name: zcash-data-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    network: {{.Network}}
-    owner: {{.Owner}}
-    volume: data
+    instance: instance
+    project: project
+    network: testnet
+    owner: admin
 spec:
   accessModes:
     - ReadWriteOnce
 {{- if .StorageClass}}
-  storageClassName: {{.StorageClass}}
+  storageClassName: csi-hostpath-sc
 {{- end}}
 {{- if .DataVolumeSource }}
   dataSource:
@@ -175,21 +174,20 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: zcash-params-{{.Name}}
-  namespace: {{.Namespace}}
+  name: zcash-params-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
-    volume: params
+    instance: instance
+    project: project
+    version: v1
+    network: testnet
+    owner: admin
 spec:
   accessModes:
     - ReadWriteOnce
 {{- if .StorageClass}}
-  storageClassName: {{.StorageClass}}
+  storageClassName: csi-hostpath-sc
 {{- end}}
 {{- if .ParamVolumeSource }}
   dataSource:
@@ -206,40 +204,40 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: zcash-node-{{.Name}}
-  namespace: {{.Namespace}}
+  name: zcash-node-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
+    instance: instance
+    project: project
+    version: v1
+    network: testnet
+    owner: admin
   annotations:
-    configmap.reloader.stakater.com/reload: "zcash-conf-{{.Name}},envoy-proxy-conf-{{.Name}}"
-    secret.reloader.stakater.com/reload:    "credentials-{{.Name}}"
+    configmap.reloader.stakater.com/reload: "zcash-conf-instance,envoy-proxy-conf-instance"
+    secret.reloader.stakater.com/reload:    "credentials-instance"
 spec:
   selector:
     matchLabels:
       platform: zbi
-      instance: {{.Name}}
-      project: {{.Project}}
-      version: {{.Version}}
-      network: {{.Network}}
-      owner: {{.Owner}}
+      instance: instance
+      project: project
+      version: v1
+      network: testnet
+      owner: admin
       app: zcashd
   template:
     metadata:
       labels:
         platform: zbi
-        instance: {{.Name}}
-        project: {{.Project}}
-        version: {{.Version}}
-        network: {{.Network}}
-        owner: {{.Owner}}
+        instance: instance
+        project: project
+        version: v1
+        network: testnet
+        owner: admin
         app: zcashd
     spec:
-      serviceAccountName: {{.ServiceAccountName}}
+      serviceAccountName: default
       securityContext:
         runAsUser: 2001
         runAsGroup: 2001
@@ -250,16 +248,16 @@ spec:
         emptyDir: {}
       - name: zcash-conf
         configMap:
-          name: zcash-conf-{{.Name}}
+          name: zcash-conf-instance
       - name: envoy-proxy-conf
         configMap:
-          name: envoy-proxy-conf-{{.Name}}
+          name: envoy-proxy-conf-instance
       - name: zcash-data
         persistentVolumeClaim:
-          claimName: zcash-data-{{.Name}}
+          claimName: zcash-data-instance
       - name: zcash-params
         persistentVolumeClaim:
-          claimName: zcash-params-{{.Name}}
+          claimName: zcash-params-instance
       initContainers:
       - name: init
         volumeMounts:
@@ -279,18 +277,18 @@ spec:
           allowPrivilegeEscalation: true
       containers:
       - name: node
-        image: {{.ZcashImage}} #electriccoinco/zcashd:v4.3.0
+        image: electriccoinco/zcashd:v4.3.0
 #        command: [ "sh", "-c", "sleep 84000s" ]
         env:
         - name: ZCASHD_RPCUSER
           valueFrom:
             secretKeyRef:
-              name: credentials-{{.Name}}
+              name: credentials-instance
               key: username
         - name: ZCASHD_RPCPASSWORD
           valueFrom:
             secretKeyRef:
-              name: credentials-{{.Name}}
+              name: credentials-instance
               key: password
         resources:
           limits:
@@ -305,14 +303,14 @@ spec:
           mountPath: /etc/zcashd
         ports:
         - name: json-rpc
-          containerPort: {{.Port}}
+          containerPort: 18232
       - name: metrics
-        image: {{.MetricsImage}} #electriccoinco/zcashd_exporter:v0.3.6
+        image: electriccoinco/zcashd_exporter:v0.3.6
         command:
         - zcashd_exporter
         args:
-        - --web.listen-address=:{{.MetricsPort}}
-        - --rpc.port={{.Port}}
+        - --web.listen-address=:9100
+        - --rpc.port=18232
         - --rpc.user=$(ZCASHD_RPCUSER)
         - --rpc.password=$(ZCASHD_RPCPASSWORD)
         - --zcash.conf.path=/etc/zcashd/zcash.conf
@@ -320,12 +318,12 @@ spec:
         - name: ZCASHD_RPCUSER
           valueFrom:
             secretKeyRef:
-              name: credentials-{{.Name}}
+              name: credentials-instance
               key: username
         - name: ZCASHD_RPCPASSWORD
           valueFrom:
             secretKeyRef:
-              name: credentials-{{.Name}}
+              name: credentials-instance
               key: password
         # resources:
         #   limits:
@@ -336,7 +334,7 @@ spec:
           mountPath: /etc/zcashd
         ports:
         - name: metrics-http
-          containerPort: {{.MetricsPort}}
+          containerPort: 9100
       - name: envoy-proxy
         image: envoyproxy/envoy:v1.20-latest
         command: ["/usr/local/bin/envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
@@ -354,90 +352,35 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: zcashd-svc-{{.Name}}
-  namespace: {{.Namespace}}
+  name: zcashd-svc-instance
+  namespace: project
   labels:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
+    instance: instance
+    project: project
+    version: v1
+    network: testnet
+    owner: admin
 spec:
   selector:
     platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
+    instance: instance
+    project: project
+    version: v1
+    network: testnet
+    owner: admin
     app: zcashd
   ports:
     - name: json-rpc
-      port: {{.Port}}
-      targetPort: {{.Port}}
+      port: 18232
+      targetPort: 18232
     - name: metrics-http
-      port: {{.MetricsPort}}
-      targetPort: {{.MetricsPort}}
+      port: 9100
+      targetPort: 9100
     - name: json-rpc-proxy
       port: 28232
       targetPort: 28232
     - name: envoy-admin
       port: 8082
       targetPort: 8082
-{{end}}
-
-{{define "SNAPSHOT"}}
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshot
-metadata:
-  name: {{.Volume}}-{{.Name}}
-  namespace: {{.Namespace}}
-  labels:
-    platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
-    volume: {{.Volume}}
-spec:
-  volumeSnapshotClassName: {{.SnapshotClass}}
-  source:
-    persistentVolumeClaimName: {{.Volume}}-{{.Name}}
-{{end}}
-
-{{define "SCHEDULE_SNAPSHOT"}}
-apiVersion: snapscheduler.backube/v1
-kind: SnapshotSchedule
-metadata:
-  name: {{.Volume}}-{{.Name}}
-  namespace: {{.Namespace}}
-  labels:
-    platform: zbi
-    instance: {{.Name}}
-    project: {{.Project}}
-    version: {{.Version}}
-    network: {{.Network}}
-    owner: {{.Owner}}
-    volume: {{.Volume}}
-spec:
-  claimSelector:
-    matchLabels:
-      platform: zbi
-      instance: {{.Name}}
-      project: {{.Project}}
-      version: {{.Version}}
-      network: {{.Network}}
-      owner: {{.Owner}}
-      volume: {{.Volume}}
-  disabled: false
-  retention:
-    expires: "{{.BackupExpiration}}"
-    maxCount: {{.MaxBackupCount}}
-  schedule: "{{.Schedule}}"
-  snapshotTemplate:
-    labels:
-      platform: zbi
-    snapshotClassName: {{.SnapshotClass}}
 {{end}}

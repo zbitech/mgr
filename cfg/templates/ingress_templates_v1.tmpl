@@ -1,0 +1,120 @@
+{{define "CONTROLLER_INGRESS"}}
+{
+  "apiVersion": "projectcontour.io/v1",
+  "kind": "HTTPProxy",
+  "metadata": {
+    "name": "zbi-proxy",
+    "namespace": "zbi",
+    "labels": {
+      "platform": "zbi"
+    }
+  },
+  "spec": {
+    "virtualhost": {
+      "fqdn": "{{.ControllerDomain}}",
+      "tls": {
+        "secretName": "{{.CertSecret}}"
+      }
+    },
+    "includes": []
+  }
+}
+{{end}}
+
+{{define "PROJECT_CONTROLLER_INGRESS"}}
+{
+  "name": "{{.Name}}",
+  "namespace": "{{.Name}}",
+  "conditions": [
+    {"prefix": "/{{.Name}}"}
+  ]
+}
+{{end}}
+
+{{define "PROJECT_INGRESS"}}
+{
+  "apiVersion": "projectcontour.io/v1",
+  "kind": "HTTPProxy",
+  "metadata": {
+    "name": "project-proxy",
+    "namespace": "zbi",
+    "labels":{
+      "platform": "zbi",
+      "project": "{{.Name}}",
+      "version": "{{.Version}}",
+      "network": "{{.Network}}",
+      "owner": "{{.Owner}}"
+    }
+  },
+  "spec": {
+    "routes":[]
+  }
+}
+{{end}}
+
+{{define "INSTANCE_PROJECT_INGRESS"}}
+{
+  "conditions": [
+    {"prefix": "/{{.Name}}/{{.Version}}"}
+  ],
+  "services": [{
+    "name": "{{.ServicePrefix}}-{{.Name}}",
+    "port": {{.ServicePort}}
+  }]
+}
+{{end}}
+
+{{define "SNAPSHOT"}}
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: {{.Volume}}-{{.Name}}
+  namespace: {{.Namespace}}
+  labels:
+    platform: zbi
+    instance: {{.Name}}
+    project: {{.Project}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+    volume: {{.Volume}}
+spec:
+  volumeSnapshotClassName: {{.SnapshotClass}}
+  source:
+    persistentVolumeClaimName: {{.Volume}}-{{.Name}}
+{{end}}
+
+{{define "SCHEDULE_SNAPSHOT"}}
+apiVersion: snapscheduler.backube/v1
+kind: SnapshotSchedule
+metadata:
+  name: {{.Volume}}-{{.Name}}
+  namespace: {{.Namespace}}
+  labels:
+    platform: zbi
+    instance: {{.Name}}
+    project: {{.Project}}
+    version: {{.Version}}
+    network: {{.Network}}
+    owner: {{.Owner}}
+    volume: {{.Volume}}
+spec:
+  claimSelector:
+    matchLabels:
+      platform: zbi
+      instance: {{.Name}}
+      project: {{.Project}}
+      version: {{.Version}}
+      network: {{.Network}}
+      owner: {{.Owner}}
+      volume: {{.Volume}}
+  disabled: false
+  retention:
+    expires: "{{.BackupExpiration}}"
+    maxCount: {{.MaxBackupCount}}
+  schedule: "{{.Schedule}}"
+  snapshotTemplate:
+    labels:
+      platform: zbi
+    snapshotClassName: {{.SnapshotClass}}
+{{end}}
